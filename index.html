@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+
+  <title>山南自動車 大抽選会</title>
+
+  <!-- LINE連携用 -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: #fff;
+      color: #222;
+
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Helvetica Neue",
+        "Yu Gothic",
+        "Meiryo",
+        sans-serif;
+    }
+
+    body {
+      min-height: 100dvh;
+    }
+
+    button {
+      font-family: inherit;
+    }
+
+    /* ========================================
+       共通
+    ======================================== */
+
+    .screen {
+      display: none;
+      width: 100%;
+      min-height: 100dvh;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    .box {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+
+    /* ========================================
+       最初の画面
+    ======================================== */
+
+    .start-subtitle {
+      margin-bottom: 10px;
+
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .start-title {
+      margin-bottom: 45px;
+
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .draw-button {
+      display: block;
+
+      width: 100%;
+      max-width: 500px;
+      min-height: 90px;
+
+      margin: 0 auto;
+
+      border: 0;
+      border-radius: 18px;
+
+      background: #111;
+      color: #fff;
+
+      font-size: 28px;
+      font-weight: 900;
+
+      cursor: pointer;
+
+      box-shadow: 0 8px 0 #555;
+    }
+
+    .draw-button:active {
+      transform: translateY(5px);
+      box-shadow: 0 3px 0 #555;
+    }
+
+    .draw-button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .loading {
+      display: none;
+
+      margin-top: 25px;
+
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .error-message {
+      display: none;
+
+      margin-top: 25px;
+      padding: 16px;
+
+      border-radius: 12px;
+
+      background: #f1f1f1;
+
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.7;
+    }
+
+
+    /* ========================================
+       動画
+    ======================================== */
+
+    #videoScreen {
+      padding: 0;
+      background: #000;
+    }
+
+    .video-wrap {
+      display: flex;
+
+      width: 100%;
+      min-height: 100dvh;
+
+      align-items: center;
+      justify-content: center;
+
+      background: #000;
+    }
+
+    #gachaVideo {
+      display: block;
+
+      width: 100%;
+      max-width: 720px;
+      max-height: 100dvh;
+
+      object-fit: contain;
+
+      background: #000;
+    }
+
+
+    /* ========================================
+       当選結果
+    ======================================== */
+
+    #resultScreen {
+      padding-top: 28px;
+      padding-bottom: 40px;
+    }
+
+    .result-title {
+      margin-bottom: 18px;
+
+      font-size: 25px;
+      font-weight: 900;
+    }
+
+
+    /* 景品画像 */
+    .prize-image {
+      display: block;
+
+      width: 78%;
+      max-width: 400px;
+      height: auto;
+
+      margin: 0 auto 25px;
+
+      object-fit: contain;
+
+      border-radius: 10px;
+    }
+
+
+    .staff-message {
+      margin: 18px 0 10px;
+
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.55;
+    }
+
+    .staff-note {
+      margin-bottom: 24px;
+
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.6;
+    }
+
+
+    /* 景品交換ボタン */
+    .redeem-button {
+      display: block;
+
+      width: 100%;
+      max-width: 500px;
+      min-height: 82px;
+
+      margin: 0 auto;
+
+      border: 0;
+      border-radius: 16px;
+
+      background: #111;
+      color: #fff;
+
+      font-size: 24px;
+      font-weight: 900;
+
+      cursor: pointer;
+    }
+
+    .redeem-button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+
+    /* 引換済み */
+    .redeemed-message {
+      display: none;
+
+      width: 100%;
+      max-width: 500px;
+
+      margin: 0 auto;
+      padding: 24px;
+
+      border-radius: 16px;
+
+      background: #e5e5e5;
+      color: #666;
+
+      font-size: 28px;
+      font-weight: 900;
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <!-- ========================================
+       最初の画面
+  ======================================== -->
+
+  <section
+    id="startScreen"
+    class="screen active"
+  >
+
+    <div class="box">
+
+      <div class="start-subtitle">
+        山南自動車公式LINE<br>
+        お友達追加
+      </div>
+
+      <div class="start-title">
+        大抽選会
+      </div>
+
+      <button
+        id="drawButton"
+        class="draw-button"
+        type="button"
+      >
+        ガチャをひく
+      </button>
+
+      <div
+        id="loading"
+        class="loading"
+      >
+        抽選中です…
+      </div>
+
+      <div
+        id="errorMessage"
+        class="error-message"
+      ></div>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- ========================================
+       動画
+  ======================================== -->
+
+  <section
+    id="videoScreen"
+    class="screen"
+  >
+
+    <div class="video-wrap">
+
+      <video
+        id="gachaVideo"
+        playsinline
+        preload="auto"
+      >
+
+        <source
+          src="y.mp4"
+          type="video/mp4"
+        >
+
+      </video>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- ========================================
+       当選結果
+  ======================================== -->
+
+  <section
+    id="resultScreen"
+    class="screen"
+  >
+
+    <div class="box">
+
+      <div class="result-title">
+        当選結果
+      </div>
+
+      <img
+        id="prizeImage"
+        class="prize-image"
+        src=""
+        alt="当選景品"
+      >
+
+
+      <div class="staff-message">
+        この画面をスタッフに<br>
+        見せてください。
+      </div>
+
+
+      <div class="staff-note">
+        景品交換ボタンは<br>
+        スタッフが操作してください。
+      </div>
+
+
+      <button
+        id="redeemButton"
+        class="redeem-button"
+        type="button"
+      >
+        景品交換する
+      </button>
+
+
+      <div
+        id="redeemedMessage"
+        class="redeemed-message"
+      >
+        引換済み
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <script>
+
+    // ==================================================
+    // GAS WebアプリURL
+    // ==================================================
+
+    const API_URL =
+      'https://script.google.com/macros/s/AKfycbxE4H0xTiuuM4tgMAH32exXPDMnq3mZDA8sEYNeZ2lpvglsyGevvzxMEBr9d9LdOkhm/exec';
+
+
+    // ==================================================
+    // 山南自動車 LIFF ID
+    //
+    // まだLINE連携前なので空欄。
+    // LINE Developers設定後ここに入れる。
+    //
+    // 例：
+    // const LIFF_ID = '1234567890-AbCdEfgh';
+    // ==================================================
+
+    const LIFF_ID = '';
+
+
+    // ==================================================
+    // HTML
+    // ==================================================
+
+    const startScreen =
+      document.getElementById(
+        'startScreen'
+      );
+
+    const videoScreen =
+      document.getElementById(
+        'videoScreen'
+      );
+
+    const resultScreen =
+      document.getElementById(
+        'resultScreen'
+      );
+
+    const drawButton =
+      document.getElementById(
+        'drawButton'
+      );
+
+    const loading =
+      document.getElementById(
+        'loading'
+      );
+
+    const errorMessage =
+      document.getElementById(
+        'errorMessage'
+      );
+
+    const gachaVideo =
+      document.getElementById(
+        'gachaVideo'
+      );
+
+    const prizeImage =
+      document.getElementById(
+        'prizeImage'
+      );
+
+    const redeemButton =
+      document.getElementById(
+        'redeemButton'
+      );
+
+    const redeemedMessage =
+      document.getElementById(
+        'redeemedMessage'
+      );
+
+
+    // ==================================================
+    // 現在の状態
+    // ==================================================
+
+    let currentDrawId = '';
+
+    let currentPrize = null;
+
+    let currentDemoMode = false;
+
+    let redeeming = false;
+
+
+
+    // ==================================================
+    // 画面切替
+    // ==================================================
+
+    function showScreen(
+      screen
+    ) {
+
+      startScreen
+        .classList
+        .remove('active');
+
+      videoScreen
+        .classList
+        .remove('active');
+
+      resultScreen
+        .classList
+        .remove('active');
+
+
+      screen
+        .classList
+        .add('active');
+
+
+      window.scrollTo(
+        0,
+        0
+      );
+    }
+
+
+
+    // ==================================================
+    // GAS GET
+    // ==================================================
+
+    async function apiGet(
+      params
+    ) {
+
+      const url =
+        new URL(
+          API_URL
+        );
+
+
+      Object.keys(
+        params
+      ).forEach(
+        key => {
+
+          url
+            .searchParams
+            .set(
+              key,
+              params[key]
+            );
+        }
+      );
+
+
+      const response =
+        await fetch(
+          url.toString()
+        );
+
+
+      return await response.json();
+    }
+
+
+
+    // ==================================================
+    // GAS POST
+    // ==================================================
+
+    async function apiPost(
+      data
+    ) {
+
+      const response =
+        await fetch(
+          API_URL,
+          {
+            method:
+              'POST',
+
+            body:
+              JSON.stringify(
+                data
+              )
+          }
+        );
+
+
+      const text =
+        await response.text();
+
+
+      try {
+
+        return JSON.parse(
+          text
+        );
+
+
+      } catch (error) {
+
+        throw new Error(
+          'サーバーから正常な応答を取得できませんでした。'
+        );
+      }
+    }
+
+
+
+    // ==================================================
+    // サーバー状態確認
+    // ==================================================
+
+    async function loadServerStatus() {
+
+      try {
+
+        const result =
+          await apiGet({
+            action:
+              'status'
+          });
+
+
+        if (
+          result &&
+          result.ok
+        ) {
+
+          currentDemoMode =
+            result.serverDemoMode ===
+            true;
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          '状態確認エラー',
+          error
+        );
+      }
+    }
+
+
+
+    // ==================================================
+    // LINE userId取得
+    // ==================================================
+
+    async function getLineUserId() {
+
+      // ------------------------------------------
+      // 強制テストモード
+      // LINEなしでOK
+      // ------------------------------------------
+
+      if (
+        currentDemoMode
+      ) {
+
+        return '';
+      }
+
+
+      // ------------------------------------------
+      // 本番なのにLIFF未設定
+      // ------------------------------------------
+
+      if (
+        !LIFF_ID
+      ) {
+
+        throw new Error(
+          'LINE連携がまだ設定されていません。'
+        );
+      }
+
+
+      // ------------------------------------------
+      // LIFF初期化
+      // ------------------------------------------
+
+      await liff.init({
+        liffId:
+          LIFF_ID
+      });
+
+
+      // ------------------------------------------
+      // LINEログインしていない
+      // ------------------------------------------
+
+      if (
+        !liff.isLoggedIn()
+      ) {
+
+        liff.login();
+
+        return '';
+      }
+
+
+      // ------------------------------------------
+      // LINEプロフィール取得
+      // ------------------------------------------
+
+      const profile =
+        await liff.getProfile();
+
+
+      return profile.userId;
+    }
+
+
+
+    // ==================================================
+    // ガチャボタン
+    // ==================================================
+
+    drawButton
+      .addEventListener(
+        'click',
+        async function () {
+
+
+          drawButton.disabled =
+            true;
+
+
+          loading.style.display =
+            'block';
+
+
+          errorMessage.style.display =
+            'none';
+
+
+          try {
+
+            // --------------------------------------
+            // 最新のテスト/本番状態取得
+            // --------------------------------------
+
+            await loadServerStatus();
+
+
+            // --------------------------------------
+            // LINE userId
+            // --------------------------------------
+
+            const userId =
+              await getLineUserId();
+
+
+            // --------------------------------------
+            // 抽選
+            //
+            // GAS側で
+            // ・時間判定
+            // ・1LINE1回
+            // ・在庫判定
+            // ・在庫減算
+            // ・ログ保存
+            // --------------------------------------
+
+            const result =
+              await apiPost({
+
+                action:
+                  'draw',
+
+                userId:
+                  userId
+
+              });
+
+
+            // --------------------------------------
+            // エラー
+            // --------------------------------------
+
+            if (
+              !result.ok
+            ) {
+
+              showError(
+                result.message ||
+                '抽選できませんでした。'
+              );
+
+              return;
+            }
+
+
+            // --------------------------------------
+            // 当選結果保存
+            // --------------------------------------
+
+            currentDrawId =
+              result.drawId;
+
+
+            currentPrize =
+              result;
+
+
+            currentDemoMode =
+              result.testMode ===
+              true;
+
+
+            // --------------------------------------
+            // 画面を閉じた場合の復旧用
+            // --------------------------------------
+
+            localStorage.setItem(
+              'yamanan_draw_id',
+              currentDrawId
+            );
+
+
+            localStorage.setItem(
+              'yamanan_demo_mode',
+              currentDemoMode
+                ? 'true'
+                : 'false'
+            );
+
+
+            // --------------------------------------
+            // ガチャ動画
+            // --------------------------------------
+
+            playGachaVideo();
+
+
+          } catch (error) {
+
+            console.error(
+              error
+            );
+
+
+            showError(
+              error.message ||
+              '通信エラーが発生しました。'
+            );
+          }
+        }
+      );
+
+
+
+    // ==================================================
+    // エラー
+    // ==================================================
+
+    function showError(
+      message
+    ) {
+
+      loading.style.display =
+        'none';
+
+
+      drawButton.disabled =
+        false;
+
+
+      errorMessage.textContent =
+        message;
+
+
+      errorMessage.style.display =
+        'block';
+    }
+
+
+
+    // ==================================================
+    // 動画再生
+    // ==================================================
+
+    async function playGachaVideo() {
+
+      loading.style.display =
+        'none';
+
+
+      showScreen(
+        videoScreen
+      );
+
+
+      gachaVideo.currentTime =
+        0;
+
+
+      gachaVideo.controls =
+        false;
+
+
+      try {
+
+        // --------------------------------------
+        // 音あり再生
+        // --------------------------------------
+
+        gachaVideo.muted =
+          false;
+
+
+        await gachaVideo.play();
+
+
+      } catch (error) {
+
+        // --------------------------------------
+        // 自動再生制限時
+        // --------------------------------------
+
+        try {
+
+          gachaVideo.muted =
+            true;
+
+
+          await gachaVideo.play();
+
+
+        } catch (error2) {
+
+          gachaVideo.controls =
+            true;
+        }
+      }
+    }
+
+
+
+    // ==================================================
+    // 動画終了
+    // ==================================================
+
+    gachaVideo
+      .addEventListener(
+        'ended',
+        function () {
+
+          showPrizeResult(
+            currentPrize
+          );
+        }
+      );
+
+
+
+    // ==================================================
+    // 景品表示
+    // ==================================================
+
+    function showPrizeResult(
+      data
+    ) {
+
+      if (
+        !data
+      ) {
+
+        return;
+      }
+
+
+      // y1.png ～ y7.png
+      prizeImage.src =
+        data.image ||
+        (
+          data.prizeId +
+          '.png'
+        );
+
+
+      showScreen(
+        resultScreen
+      );
+
+
+      // ------------------------------------------
+      // 引換済みの場合
+      // ------------------------------------------
+
+      if (
+        data.redeemStatus ===
+        '引換済み'
+      ) {
+
+        showRedeemed();
+
+
+      } else {
+
+        redeemButton.style.display =
+          'block';
+
+
+        redeemButton.disabled =
+          false;
+
+
+        redeemButton.textContent =
+          '景品交換する';
+
+
+        redeemedMessage.style.display =
+          'none';
+      }
+    }
+
+
+
+    // ==================================================
+    // 景品交換
+    // ==================================================
+
+    redeemButton
+      .addEventListener(
+        'click',
+        async function () {
+
+
+          if (
+            redeeming ||
+            !currentDrawId
+          ) {
+
+            return;
+          }
+
+
+          const confirmed =
+            window.confirm(
+              'スタッフの方が操作していますか？\n\n景品をお客様へお渡しした後に「OK」を押してください。'
+            );
+
+
+          if (
+            !confirmed
+          ) {
+
+            return;
+          }
+
+
+          redeeming =
+            true;
+
+
+          redeemButton.disabled =
+            true;
+
+
+          redeemButton.textContent =
+            '処理中…';
+
+
+          try {
+
+            const result =
+              await apiPost({
+
+                action:
+                  'redeem',
+
+                drawId:
+                  currentDrawId
+
+              });
+
+
+            if (
+              !result.ok
+            ) {
+
+              alert(
+                result.message ||
+                '引換処理に失敗しました。'
+              );
+
+
+              redeemButton.disabled =
+                false;
+
+
+              redeemButton.textContent =
+                '景品交換する';
+
+
+              redeeming =
+                false;
+
+
+              return;
+            }
+
+
+            showRedeemed();
+
+
+            // --------------------------------------
+            // 強制テストモードの場合だけ
+            //
+            // 引換終了後に復旧データを削除。
+            //
+            // これによりページ更新すれば
+            // またテスト抽選できる。
+            //
+            // 画面には
+            // 「テストでもう一度」のボタンは出さない。
+            // --------------------------------------
+
+            if (
+              currentDemoMode
+            ) {
+
+              localStorage.removeItem(
+                'yamanan_draw_id'
+              );
+
+
+              localStorage.removeItem(
+                'yamanan_demo_mode'
+              );
+            }
+
+
+          } catch (error) {
+
+            console.error(
+              error
+            );
+
+
+            alert(
+              '通信エラーが発生しました。'
+            );
+
+
+            redeemButton.disabled =
+              false;
+
+
+            redeemButton.textContent =
+              '景品交換する';
+
+
+            redeeming =
+              false;
+          }
+        }
+      );
+
+
+
+    // ==================================================
+    // 引換済み表示
+    // ==================================================
+
+    function showRedeemed() {
+
+      redeemButton.style.display =
+        'none';
+
+
+      redeemedMessage.style.display =
+        'block';
+
+
+      redeeming =
+        false;
+    }
+
+
+
+    // ==================================================
+    // 当選結果復旧
+    //
+    // 誤って閉じた
+    // 戻る
+    // 再読み込み
+    // した場合の救済
+    // ==================================================
+
+    async function restoreResult() {
+
+      const savedDrawId =
+        localStorage.getItem(
+          'yamanan_draw_id'
+        );
+
+
+      if (
+        !savedDrawId
+      ) {
+
+        return;
+      }
+
+
+      currentDrawId =
+        savedDrawId;
+
+
+      currentDemoMode =
+        localStorage.getItem(
+          'yamanan_demo_mode'
+        ) ===
+        'true';
+
+
+      try {
+
+        const result =
+          await apiGet({
+
+            action:
+              'result',
+
+            drawId:
+              savedDrawId
+
+          });
+
+
+        // --------------------------------------
+        // 9/24後にログをリセットした場合など
+        // 抽選IDがもう存在しない
+        // --------------------------------------
+
+        if (
+          !result.ok
+        ) {
+
+          localStorage.removeItem(
+            'yamanan_draw_id'
+          );
+
+
+          localStorage.removeItem(
+            'yamanan_demo_mode'
+          );
+
+
+          return;
+        }
+
+
+        currentPrize =
+          result;
+
+
+        showPrizeResult(
+          result
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          '結果復旧エラー',
+          error
+        );
+      }
+    }
+
+
+
+    // ==================================================
+    // 起動
+    // ==================================================
+
+    async function startApp() {
+
+      await loadServerStatus();
+
+      await restoreResult();
+    }
+
+
+    startApp();
+
+  </script>
+
+</body>
+</html>
