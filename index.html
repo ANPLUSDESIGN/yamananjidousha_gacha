@@ -10,7 +10,7 @@
 
   <title>山南自動車 大抽選会</title>
 
-  <!-- LINE連携用 -->
+  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
@@ -43,6 +43,7 @@
     button {
       font-family: inherit;
     }
+
 
     /* ========================================
        共通
@@ -197,8 +198,6 @@
       font-weight: 900;
     }
 
-
-    /* 景品画像 */
     .prize-image {
       display: block;
 
@@ -212,7 +211,6 @@
 
       border-radius: 10px;
     }
-
 
     .staff-message {
       margin: 18px 0 10px;
@@ -231,7 +229,10 @@
     }
 
 
-    /* 景品交換ボタン */
+    /* ========================================
+       景品交換
+    ======================================== */
+
     .redeem-button {
       display: block;
 
@@ -258,8 +259,6 @@
       cursor: default;
     }
 
-
-    /* 引換済み */
     .redeemed-message {
       display: none;
 
@@ -328,7 +327,6 @@
   </section>
 
 
-
   <!-- ========================================
        動画
   ======================================== -->
@@ -358,7 +356,6 @@
   </section>
 
 
-
   <!-- ========================================
        当選結果
   ======================================== -->
@@ -381,18 +378,15 @@
         alt="当選景品"
       >
 
-
       <div class="staff-message">
         この画面をスタッフに<br>
         見せてください。
       </div>
 
-
       <div class="staff-note">
         景品交換ボタンは<br>
         スタッフが操作してください。
       </div>
-
 
       <button
         id="redeemButton"
@@ -401,7 +395,6 @@
       >
         景品交換する
       </button>
-
 
       <div
         id="redeemedMessage"
@@ -413,7 +406,6 @@
     </div>
 
   </section>
-
 
 
   <script>
@@ -428,15 +420,10 @@
 
     // ==================================================
     // 山南自動車 LIFF ID
-    //
-    // まだLINE連携前なので空欄。
-    // LINE Developers設定後ここに入れる。
-    //
-    // 例：
-    // const LIFF_ID = '1234567890-AbCdEfgh';
     // ==================================================
 
-    const LIFF_ID = '2011684043-GnjrPlL2';
+    const LIFF_ID =
+      '2011684043-GnjrPlL2';
 
 
     // ==================================================
@@ -506,6 +493,7 @@
 
     let redeeming = false;
 
+    let liffInitialized = false;
 
 
     // ==================================================
@@ -541,7 +529,6 @@
     }
 
 
-
     // ==================================================
     // GAS GET
     // ==================================================
@@ -573,13 +560,16 @@
 
       const response =
         await fetch(
-          url.toString()
+          url.toString(),
+          {
+            cache:
+              'no-store'
+          }
         );
 
 
       return await response.json();
     }
-
 
 
     // ==================================================
@@ -625,7 +615,6 @@
     }
 
 
-
     // ==================================================
     // サーバー状態確認
     // ==================================================
@@ -662,51 +651,50 @@
     }
 
 
-
     // ==================================================
     // LINE userId取得
+    //
+    // テスト・本番どちらも
+    // LIFF必須
+    // LINE userId必須
     // ==================================================
 
     async function getLineUserId() {
 
       // ------------------------------------------
-      // LIFF未設定
-      //
-      // テストモード時だけLINEなしでも動作可能
+      // LIFF ID確認
       // ------------------------------------------
 
       if (
         !LIFF_ID
       ) {
 
-        if (
-          currentDemoMode
-        ) {
-
-          return '';
-        }
-
         throw new Error(
-          'LINE連携がまだ設定されていません。'
+          'LINE連携が設定されていません。'
         );
       }
 
 
       // ------------------------------------------
       // LIFF初期化
-      //
-      // テストモードでもLIFF IDが設定されていれば
-      // 実際のLINE userIdを取得する
       // ------------------------------------------
 
-      await liff.init({
-        liffId:
-          LIFF_ID
-      });
+      if (
+        !liffInitialized
+      ) {
+
+        await liff.init({
+          liffId:
+            LIFF_ID
+        });
+
+        liffInitialized =
+          true;
+      }
 
 
       // ------------------------------------------
-      // LINEログインしていない
+      // LINEログイン
       // ------------------------------------------
 
       if (
@@ -727,13 +715,21 @@
         await liff.getProfile();
 
 
-      // ------------------------------------------
-      // LINE userIdを返す
-      // ------------------------------------------
+      if (
+        !profile ||
+        !profile.userId
+      ) {
 
-      return profile.userId;
+        throw new Error(
+          'LINE認証を確認できませんでした。'
+        );
+      }
+
+
+      return String(
+        profile.userId
+      );
     }
-
 
 
     // ==================================================
@@ -749,10 +745,8 @@
           drawButton.disabled =
             true;
 
-
           loading.style.display =
             'block';
-
 
           errorMessage.style.display =
             'none';
@@ -761,18 +755,33 @@
           try {
 
             // --------------------------------------
-            // 最新のテスト/本番状態取得
+            // 最新のテスト / 本番状態取得
             // --------------------------------------
 
             await loadServerStatus();
 
 
             // --------------------------------------
-            // LINE userId
+            // LINE userId取得
             // --------------------------------------
 
             const userId =
               await getLineUserId();
+
+
+            // LINEログイン画面へ移動した場合
+            if (
+              !userId
+            ) {
+
+              loading.style.display =
+                'none';
+
+              drawButton.disabled =
+                false;
+
+              return;
+            }
 
 
             // --------------------------------------
@@ -780,6 +789,7 @@
             //
             // GAS側で
             // ・時間判定
+            // ・LINE userId確認
             // ・1LINE1回
             // ・在庫判定
             // ・在庫減算
@@ -799,7 +809,7 @@
 
 
             // --------------------------------------
-            // エラー
+            // 抽選エラー
             // --------------------------------------
 
             if (
@@ -808,6 +818,7 @@
 
               showError(
                 result.message ||
+                result.error ||
                 '抽選できませんでした。'
               );
 
@@ -822,10 +833,8 @@
             currentDrawId =
               result.drawId;
 
-
             currentPrize =
               result;
-
 
             currentDemoMode =
               result.testMode ===
@@ -833,14 +842,13 @@
 
 
             // --------------------------------------
-            // 画面を閉じた場合の復旧用
+            // 誤って画面を閉じた場合の復旧用
             // --------------------------------------
 
             localStorage.setItem(
               'yamanan_draw_id',
               currentDrawId
             );
-
 
             localStorage.setItem(
               'yamanan_demo_mode',
@@ -873,7 +881,6 @@
       );
 
 
-
     // ==================================================
     // エラー
     // ==================================================
@@ -885,19 +892,15 @@
       loading.style.display =
         'none';
 
-
       drawButton.disabled =
         false;
-
 
       errorMessage.textContent =
         message;
 
-
       errorMessage.style.display =
         'block';
     }
-
 
 
     // ==================================================
@@ -918,7 +921,6 @@
       gachaVideo.currentTime =
         0;
 
-
       gachaVideo.controls =
         false;
 
@@ -931,7 +933,6 @@
 
         gachaVideo.muted =
           false;
-
 
         await gachaVideo.play();
 
@@ -947,7 +948,6 @@
           gachaVideo.muted =
             true;
 
-
           await gachaVideo.play();
 
 
@@ -958,7 +958,6 @@
         }
       }
     }
-
 
 
     // ==================================================
@@ -975,7 +974,6 @@
           );
         }
       );
-
 
 
     // ==================================================
@@ -1025,20 +1023,16 @@
         redeemButton.style.display =
           'block';
 
-
         redeemButton.disabled =
           false;
 
-
         redeemButton.textContent =
           '景品交換する';
-
 
         redeemedMessage.style.display =
           'none';
       }
     }
-
 
 
     // ==================================================
@@ -1077,10 +1071,8 @@
           redeeming =
             true;
 
-
           redeemButton.disabled =
             true;
-
 
           redeemButton.textContent =
             '処理中…';
@@ -1106,6 +1098,7 @@
 
               alert(
                 result.message ||
+                result.error ||
                 '引換処理に失敗しました。'
               );
 
@@ -1113,14 +1106,11 @@
               redeemButton.disabled =
                 false;
 
-
               redeemButton.textContent =
                 '景品交換する';
 
-
               redeeming =
                 false;
-
 
               return;
             }
@@ -1130,15 +1120,17 @@
 
 
             // --------------------------------------
-            // 強制テストモードの場合だけ
+            // テストモードの場合
             //
-            // 引換終了後に復旧データを削除。
+            // 引換終了後は復旧用drawIdだけ削除する。
             //
-            // これによりページ更新すれば
-            // またテスト抽選できる。
+            // ただしGASのガチャログには
+            // LINE userIdが残っているので、
+            // リセットするまでは同じ人は
+            // 2回目を引けない。
             //
-            // 画面には
-            // 「テストでもう一度」のボタンは出さない。
+            // resetTestData()実行後は
+            // 同じLINEで再テスト可能。
             // --------------------------------------
 
             if (
@@ -1148,7 +1140,6 @@
               localStorage.removeItem(
                 'yamanan_draw_id'
               );
-
 
               localStorage.removeItem(
                 'yamanan_demo_mode'
@@ -1171,17 +1162,14 @@
             redeemButton.disabled =
               false;
 
-
             redeemButton.textContent =
               '景品交換する';
-
 
             redeeming =
               false;
           }
         }
       );
-
 
 
     // ==================================================
@@ -1193,24 +1181,22 @@
       redeemButton.style.display =
         'none';
 
-
       redeemedMessage.style.display =
         'block';
-
 
       redeeming =
         false;
     }
 
 
-
     // ==================================================
     // 当選結果復旧
     //
-    // 誤って閉じた
-    // 戻る
-    // 再読み込み
-    // した場合の救済
+    // ・誤って閉じた
+    // ・戻る
+    // ・再読み込み
+    //
+    // の場合に当選結果を復元
     // ==================================================
 
     async function restoreResult() {
@@ -1233,13 +1219,6 @@
         savedDrawId;
 
 
-      currentDemoMode =
-        localStorage.getItem(
-          'yamanan_demo_mode'
-        ) ===
-        'true';
-
-
       try {
 
         const result =
@@ -1255,8 +1234,8 @@
 
 
         // --------------------------------------
-        // 9/24後にログをリセットした場合など
-        // 抽選IDがもう存在しない
+        // リセット後など
+        // 抽選IDが存在しない場合
         // --------------------------------------
 
         if (
@@ -1267,11 +1246,15 @@
             'yamanan_draw_id'
           );
 
-
           localStorage.removeItem(
             'yamanan_demo_mode'
           );
 
+          currentDrawId =
+            '';
+
+          currentPrize =
+            null;
 
           return;
         }
@@ -1279,6 +1262,18 @@
 
         currentPrize =
           result;
+
+        currentDemoMode =
+          result.testMode ===
+          true;
+
+
+        localStorage.setItem(
+          'yamanan_demo_mode',
+          currentDemoMode
+            ? 'true'
+            : 'false'
+        );
 
 
         showPrizeResult(
@@ -1294,7 +1289,6 @@
         );
       }
     }
-
 
 
     // ==================================================
