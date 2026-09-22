@@ -158,6 +158,7 @@
     }
 
     .video-wrap {
+      position: relative;
       display: flex;
 
       width: 100%;
@@ -179,6 +180,26 @@
       object-fit: contain;
 
       background: #000;
+    }
+
+    .video-status {
+      display: none;
+      position: absolute;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+
+      width: calc(100% - 40px);
+      max-width: 520px;
+      padding: 14px 18px;
+
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+
+      font-size: 18px;
+      font-weight: 900;
+      text-align: center;
     }
 
 
@@ -376,6 +397,13 @@
 
       </video>
 
+      <div
+        id="videoStatus"
+        class="video-status"
+      >
+        抽選結果を確認中です…
+      </div>
+
     </div>
 
   </section>
@@ -484,6 +512,11 @@
         'gachaVideo'
       );
 
+    const videoStatus =
+      document.getElementById(
+        'videoStatus'
+      );
+
     const prizeImage =
       document.getElementById(
         'prizeImage'
@@ -512,7 +545,15 @@
 
     let redeeming = false;
 
+    let redeemCheckOnly = false;
+
     let liffInitialized = false;
+
+    let cachedUserId = '';
+
+    let lineUserPromise = null;
+
+    let videoFinished = false;
 
 
     // ==================================================
@@ -716,6 +757,124 @@
 
 
     // ==================================================
+    // LINE認証を先に準備しておく
+    // ==================================================
+
+    async function prepareLineUserId() {
+
+      if (
+        cachedUserId
+      ) {
+
+        return cachedUserId;
+      }
+
+
+      if (
+        !lineUserPromise
+      ) {
+
+        lineUserPromise =
+          getLineUserId()
+            .then(
+              userId => {
+
+                if (
+                  userId
+                ) {
+
+                  cachedUserId =
+                    userId;
+                }
+
+                return userId;
+              }
+            )
+            .catch(
+              error => {
+
+                lineUserPromise =
+                  null;
+
+                throw error;
+              }
+            );
+      }
+
+
+      return await lineUserPromise;
+    }
+
+
+    // ==================================================
+    // 待機
+    // ==================================================
+
+    function wait(
+      ms
+    ) {
+
+      return new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            ms
+          )
+      );
+    }
+
+
+    // ==================================================
+    // 景品引換状態を確認
+    // ==================================================
+
+    async function checkRedeemStatus() {
+
+      const result =
+        await Promise.race([
+
+          apiGet({
+
+            action:
+              'result',
+
+            drawId:
+              currentDrawId
+
+          }),
+
+          wait(
+            7000
+          ).then(
+            () => {
+
+              throw new Error(
+                'timeout'
+              );
+            }
+          )
+
+        ]);
+
+
+      if (
+        result &&
+        result.ok &&
+        result.redeemStatus ===
+        '引換済み'
+      ) {
+
+        showRedeemed();
+
+        return true;
+      }
+
+
+      return false;
+    }
+
+
+    // ==================================================
     // ガチャボタン
     // ==================================================
 
@@ -725,11 +884,64 @@
         async function () {
 
 
+          // --------------------------------------
+          // この端末ですでに抽選済みなら
+          // GASへ再抽選POSTを送らず結果を復元
+          // --------------------------------------
+
+          const savedDrawId =
+            localStorage.getItem(
+              'yamanan_draw_id'
+            );
+
+
+          if (
+            savedDrawId
+          ) {
+
+            drawButton.disabled =
+              true;
+
+            drawButton.textContent =
+              '抽選済み';
+
+            loading.textContent =
+              '当選結果を確認しています…';
+
+            loading.style.display =
+              'block';
+
+            errorMessage.style.display =
+              'none';
+
+
+            currentDrawId =
+              savedDrawId;
+
+
+            if (
+              currentPrize
+            ) {
+
+              showPrizeResult(
+                currentPrize
+              );
+
+              return;
+            }
+
+
+            await restoreResult();
+
+            return;
+          }
+
+
           drawButton.disabled =
             true;
 
           loading.style.display =
-            'block';
+            'none';
 
           errorMessage.style.display =
             'none';
@@ -738,20 +950,16 @@
           try {
 
             // --------------------------------------
-            // LINE userId取得
+            // 起動時から準備しているLINE userIdを使用
             // --------------------------------------
 
             const userId =
-              await getLineUserId();
+              await prepareLineUserId();
 
 
-            // LINEログイン画面へ移動した場合
             if (
               !userId
             ) {
-
-              loading.style.display =
-                'none';
 
               drawButton.disabled =
                 false;
@@ -761,16 +969,22 @@
 
 
             // --------------------------------------
-            // 抽選
-            //
-            // GAS側で
-            // ・時間判定
-            // ・LINE userId確認
-            // ・1LINE1回
-            // ・在庫判定
-            // ・在庫減算
-            // ・ログ保存
+            // ボタンを押したら先に動画開始
+            // GAS抽選は動画と同時進行
             // --------------------------------------
+
+            currentPrize =
+              null;
+
+            videoFinished =
+              false;
+
+            videoStatus.style.display =
+              'none';
+
+
+            playGachaVideo();
+
 
             const result =
               await apiPost({
@@ -784,13 +998,18 @@
               });
 
 
-            // --------------------------------------
-            // 抽選エラー
-            // --------------------------------------
-
             if (
               !result.ok
             ) {
+
+              gachaVideo.pause();
+
+              videoStatus.style.display =
+                'none';
+
+              showScreen(
+                startScreen
+              );
 
               showError(
                 result.message ||
@@ -802,10 +1021,6 @@
             }
 
 
-            // --------------------------------------
-            // 当選結果保存
-            // --------------------------------------
-
             currentDrawId =
               result.drawId;
 
@@ -816,10 +1031,6 @@
               result.testMode ===
               true;
 
-
-            // --------------------------------------
-            // 誤って画面を閉じた場合の復旧用
-            // --------------------------------------
 
             localStorage.setItem(
               'yamanan_draw_id',
@@ -834,17 +1045,36 @@
             );
 
 
-            // --------------------------------------
-            // ガチャ動画
-            // --------------------------------------
+            videoStatus.style.display =
+              'none';
 
-            playGachaVideo();
+
+            // 動画が先に終わっていた場合だけ
+            // ここで結果画面へ
+            if (
+              videoFinished
+            ) {
+
+              showPrizeResult(
+                currentPrize
+              );
+            }
 
 
           } catch (error) {
 
             console.error(
               error
+            );
+
+
+            gachaVideo.pause();
+
+            videoStatus.style.display =
+              'none';
+
+            showScreen(
+              startScreen
             );
 
 
@@ -945,9 +1175,24 @@
         'ended',
         function () {
 
-          showPrizeResult(
+          videoFinished =
+            true;
+
+
+          if (
             currentPrize
-          );
+          ) {
+
+            showPrizeResult(
+              currentPrize
+            );
+
+
+          } else {
+
+            videoStatus.style.display =
+              'block';
+          }
         }
       );
 
@@ -976,6 +1221,9 @@
           '.png'
         );
 
+
+      videoStatus.style.display =
+        'none';
 
       showScreen(
         resultScreen
@@ -1030,6 +1278,72 @@
           }
 
 
+          // --------------------------------------
+          // 前回の通信が長引いた場合は
+          // 二重POSTせず引換状態だけ確認
+          // --------------------------------------
+
+          if (
+            redeemCheckOnly
+          ) {
+
+            redeeming =
+              true;
+
+            redeemButton.disabled =
+              true;
+
+            redeemButton.textContent =
+              '確認中…';
+
+
+            try {
+
+              const redeemed =
+                await checkRedeemStatus();
+
+
+              if (
+                !redeemed
+              ) {
+
+                alert(
+                  'まだ引換完了を確認できません。通信状況を確認して、もう一度「引換状況を再確認」を押してください。'
+                );
+
+                redeemButton.disabled =
+                  false;
+
+                redeemButton.textContent =
+                  '引換状況を再確認';
+              }
+
+
+            } catch (error) {
+
+              console.error(
+                error
+              );
+
+              alert(
+                '引換状況の確認に時間がかかっています。もう一度お試しください。'
+              );
+
+              redeemButton.disabled =
+                false;
+
+              redeemButton.textContent =
+                '引換状況を再確認';
+            }
+
+
+            redeeming =
+              false;
+
+            return;
+          }
+
+
           const confirmed =
             window.confirm(
               'スタッフの方が操作していますか？\n\n景品をお客様へお渡しした後に「OK」を押してください。'
@@ -1056,8 +1370,10 @@
 
           try {
 
-            const result =
-              await apiPost({
+            // POSTは送信したまま、
+            // 9秒を超えたら結果確認へ切り替える
+            const redeemPost =
+              apiPost({
 
                 action:
                   'redeem',
@@ -1068,16 +1384,81 @@
               });
 
 
+            const firstResult =
+              await Promise.race([
+
+                redeemPost
+                  .then(
+                    result => ({
+                      type:
+                        'result',
+
+                      result:
+                        result
+                    })
+                  )
+                  .catch(
+                    error => ({
+                      type:
+                        'error',
+
+                      error:
+                        error
+                    })
+                  ),
+
+                wait(
+                  9000
+                ).then(
+                  () => ({
+                    type:
+                      'timeout'
+                  })
+                )
+
+              ]);
+
+
             if (
-              !result.ok
+              firstResult.type ===
+              'result'
             ) {
+
+              const result =
+                firstResult.result;
+
+
+              if (
+                result.ok
+              ) {
+
+                showRedeemed();
+
+                return;
+              }
+
+
+              // GAS側で既に引換済みになっている可能性も確認
+              const redeemed =
+                await checkRedeemStatus()
+                  .catch(
+                    () => false
+                  );
+
+
+              if (
+                redeemed
+              ) {
+
+                return;
+              }
+
 
               alert(
                 result.message ||
                 result.error ||
                 '引換処理に失敗しました。'
               );
-
 
               redeemButton.disabled =
                 false;
@@ -1092,35 +1473,55 @@
             }
 
 
-            showRedeemed();
-
-
-            // --------------------------------------
-            // テストモードの場合
-            //
-            // 引換終了後は復旧用drawIdだけ削除する。
-            //
-            // ただしGASのガチャログには
-            // LINE userIdが残っているので、
-            // リセットするまでは同じ人は
-            // 2回目を引けない。
-            //
-            // resetTestData()実行後は
-            // 同じLINEで再テスト可能。
-            // --------------------------------------
-
             if (
-              currentDemoMode
+              firstResult.type ===
+              'error'
             ) {
 
-              localStorage.removeItem(
-                'yamanan_draw_id'
-              );
-
-              localStorage.removeItem(
-                'yamanan_demo_mode'
-              );
+              throw firstResult.error;
             }
+
+
+            // --------------------------------------
+            // 9秒以上かかった場合
+            // POSTを重複送信せず、結果だけ確認
+            // --------------------------------------
+
+            redeemButton.textContent =
+              '確認中…';
+
+
+            const redeemed =
+              await checkRedeemStatus()
+                .catch(
+                  () => false
+                );
+
+
+            if (
+              redeemed
+            ) {
+
+              return;
+            }
+
+
+            redeemCheckOnly =
+              true;
+
+            redeemButton.disabled =
+              false;
+
+            redeemButton.textContent =
+              '引換状況を再確認';
+
+            redeeming =
+              false;
+
+
+            alert(
+              '通信に時間がかかっています。引換処理は送信済みです。少し待ってから「引換状況を再確認」を押してください。'
+            );
 
 
           } catch (error) {
@@ -1130,8 +1531,27 @@
             );
 
 
+            // 通信エラーでも、サーバー側で完了している可能性を確認
+            const redeemed =
+              await checkRedeemStatus()
+                .catch(
+                  () => false
+                );
+
+
+            if (
+              redeemed
+            ) {
+
+              return;
+            }
+
+
+            redeemCheckOnly =
+              true;
+
             alert(
-              '通信エラーが発生しました。'
+              '通信に時間がかかっています。二重処理を防ぐため、次は「引換状況を再確認」を押してください。'
             );
 
 
@@ -1139,7 +1559,7 @@
               false;
 
             redeemButton.textContent =
-              '景品交換する';
+              '引換状況を再確認';
 
             redeeming =
               false;
@@ -1161,6 +1581,9 @@
         'block';
 
       redeeming =
+        false;
+
+      redeemCheckOnly =
         false;
     }
 
@@ -1232,6 +1655,24 @@
           currentPrize =
             null;
 
+          loading.style.display =
+            'none';
+
+          drawButton.disabled =
+            false;
+
+          drawButton.textContent =
+            'ガチャをひく';
+
+          prepareLineUserId()
+            .catch(
+              error =>
+                console.error(
+                  'LINE事前認証エラー',
+                  error
+                )
+            );
+
           return;
         }
 
@@ -1252,6 +1693,9 @@
         );
 
 
+        loading.style.display =
+          'none';
+
         showPrizeResult(
           result
         );
@@ -1263,6 +1707,25 @@
           '結果復旧エラー',
           error
         );
+
+        if (
+          localStorage.getItem(
+            'yamanan_draw_id'
+          )
+        ) {
+
+          drawButton.disabled =
+            true;
+
+          drawButton.textContent =
+            '抽選済み';
+
+          loading.textContent =
+            '当選結果の確認に時間がかかっています…';
+
+          loading.style.display =
+            'block';
+        }
       }
     }
 
@@ -1273,7 +1736,44 @@
 
     async function startApp() {
 
-      await restoreResult();
+      const savedDrawId =
+        localStorage.getItem(
+          'yamanan_draw_id'
+        );
+
+
+      if (
+        savedDrawId
+      ) {
+
+        drawButton.disabled =
+          true;
+
+        drawButton.textContent =
+          '抽選済み';
+
+        loading.textContent =
+          '当選結果を確認しています…';
+
+        loading.style.display =
+          'block';
+
+        await restoreResult();
+
+
+      } else {
+
+        // ガチャを押す前にLIFF認証を準備
+        // クリック後の待ち時間を減らす
+        prepareLineUserId()
+          .catch(
+            error =>
+              console.error(
+                'LINE事前認証エラー',
+                error
+              )
+          );
+      }
     }
 
 
