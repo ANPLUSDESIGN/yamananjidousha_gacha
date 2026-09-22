@@ -187,45 +187,49 @@
     ======================================== */
 
     #resultScreen {
-      padding-top: 28px;
-      padding-bottom: 40px;
+      padding: 12px 0 28px;
+      align-items: flex-start;
     }
 
     .result-title {
-      margin-bottom: 18px;
+      margin: 6px 0 12px;
 
       font-size: 25px;
       font-weight: 900;
     }
 
+    .prize-wrap {
+      position: relative;
+
+      width: 100%;
+      max-width: 720px;
+
+      margin: 0 auto;
+    }
+
     .prize-image {
       display: block;
 
-      width: 78%;
-      max-width: 400px;
+      width: 100%;
       height: auto;
 
-      margin: 0 auto 25px;
+      margin: 0;
 
       object-fit: contain;
-
-      border-radius: 10px;
     }
 
-    .staff-message {
-      margin: 18px 0 10px;
+    .prize-wrap .redeem-button,
+    .prize-wrap .redeemed-message {
+      position: absolute;
 
-      font-size: 22px;
-      font-weight: 900;
-      line-height: 1.55;
-    }
+      left: 50%;
+      bottom: 4.5%;
 
-    .staff-note {
-      margin-bottom: 24px;
+      width: 76%;
+      max-width: 540px;
 
-      font-size: 16px;
-      font-weight: 800;
-      line-height: 1.6;
+      transform: translateX(-50%);
+      z-index: 2;
     }
 
 
@@ -275,6 +279,27 @@
 
       font-size: 28px;
       font-weight: 900;
+    }
+
+    #resultScreen .box {
+      max-width: 720px;
+      padding: 0 12px;
+    }
+
+    @media (max-width: 480px) {
+      .result-title {
+        font-size: 20px;
+      }
+
+      .redeem-button {
+        min-height: 62px;
+        font-size: 20px;
+      }
+
+      .redeemed-message {
+        padding: 18px;
+        font-size: 22px;
+      }
     }
   </style>
 </head>
@@ -371,36 +396,30 @@
         当選結果
       </div>
 
-      <img
-        id="prizeImage"
-        class="prize-image"
-        src=""
-        alt="当選景品"
-      >
+      <div class="prize-wrap">
 
-      <div class="staff-message">
-        この画面をスタッフに<br>
-        見せてください。
-      </div>
+        <img
+          id="prizeImage"
+          class="prize-image"
+          src=""
+          alt="当選景品"
+        >
 
-      <div class="staff-note">
-        景品交換ボタンは<br>
-        スタッフが操作してください。
-      </div>
+        <button
+          id="redeemButton"
+          class="redeem-button"
+          type="button"
+        >
+          景品交換する
+        </button>
 
-      <button
-        id="redeemButton"
-        class="redeem-button"
-        type="button"
-      >
-        景品交換する
-      </button>
+        <div
+          id="redeemedMessage"
+          class="redeemed-message"
+        >
+          引換済み
+        </div>
 
-      <div
-        id="redeemedMessage"
-        class="redeemed-message"
-      >
-        引換済み
       </div>
 
     </div>
