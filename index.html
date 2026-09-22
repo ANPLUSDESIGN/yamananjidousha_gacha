@@ -9,7 +9,7 @@
   <meta http-equiv="Expires" content="0">
   <title>山南自動車 大抽選会</title>
 
-  <link rel="preload" as="image" href="yt.png?v=final1">
+  <link rel="preload" as="image" href="yt.png?v=final2">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
@@ -50,7 +50,7 @@
 
   <section id="startScreen" class="screen active">
     <div class="frame">
-      <img id="topImage" class="full-image" src="yt.png?v=final1" width="720" height="1080" alt="山南自動車 大抽選会">
+      <img id="topImage" class="full-image" src="yt.png?v=final2" width="720" height="1080" alt="山南自動車 大抽選会">
       <div id="startMessage" role="status" aria-live="polite"></div>
       <button id="drawButton" type="button" disabled>LINE認証を確認しています…</button>
     </div>
@@ -58,7 +58,7 @@
 
   <section id="videoScreen" class="screen">
     <div class="frame">
-      <video id="gachaVideo" src="y.mp4?v=final1" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
+      <video id="gachaVideo" src="y.mp4?v=final2" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
       <div id="videoTap"><button id="videoTapButton" type="button">タップして動画を再生</button></div>
     </div>
   </section>
@@ -75,7 +75,7 @@
 <script>
   // ==================================================
   // 山南自動車 FINAL
-  // LIFF profileでuserId取得 + GAS JSONP通信
+  // LIFF profileでuserId取得 + GAS iframe bridge通信
   // fetch / AbortController / ID Token / UrlFetchApp は使わない
   // ==================================================
 
@@ -121,12 +121,22 @@
   }
 
   // ==================================================
-  // GAS JSONP通信
+  // GAS通信
+  // LINE内ブラウザでJSONPの<script>読込が失敗する端末対策。
+  // 非表示iframeでGASを開き、postMessageで結果だけ受け取る。
+  // fetch / CORS は使わない。
   // ==================================================
   function requestApi(action, params = {}){
     return new Promise((resolve,reject)=>{
-      const callbackName = 'yamananCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      const script = document.createElement('script');
+      const nonce =
+        Date.now().toString(36) +
+        '_' +
+        Math.random().toString(36).slice(2);
+
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden','true');
+
       let finished = false;
 
       const timer = setTimeout(()=>{
@@ -138,33 +148,58 @@
         if(finished)return;
         finished = true;
         clearTimeout(timer);
-        try{delete window[callbackName]}catch(e){window[callbackName]=undefined}
-        if(script.parentNode)script.parentNode.removeChild(script);
+        window.removeEventListener('message',onMessage);
+
+        if(iframe.parentNode){
+          iframe.parentNode.removeChild(iframe);
+        }
       }
 
-      window[callbackName] = data => {
-        cleanup();
-        resolve(data);
-      };
+      function onMessage(event){
+        let message = event.data;
 
-      script.onerror = () => {
-        cleanup();
-        reject(new Error('通信エラー'));
-      };
+        if(typeof message === 'string'){
+          try{
+            message = JSON.parse(message);
+          }catch(e){
+            return;
+          }
+        }
 
-      let url = GACHA_API_URL +
+        if(
+          !message ||
+          message.source !== 'yamanan-gacha-bridge' ||
+          message.nonce !== nonce
+        ){
+          return;
+        }
+
+        cleanup();
+        resolve(message.payload);
+      }
+
+      window.addEventListener('message',onMessage);
+
+      let url =
+        GACHA_API_URL +
         '?action=' + encodeURIComponent(action) +
-        '&callback=' + encodeURIComponent(callbackName) +
+        '&bridge=1' +
+        '&nonce=' + encodeURIComponent(nonce) +
         '&_=' + Date.now();
 
       Object.keys(params).forEach(key=>{
-        url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+        url +=
+          '&' +
+          encodeURIComponent(key) +
+          '=' +
+          encodeURIComponent(params[key]);
       });
 
-      script.src = url;
-      document.head.appendChild(script);
+      iframe.src = url;
+      document.body.appendChild(iframe);
     });
   }
+
 
   // ==================================================
   // LINE認証
@@ -201,7 +236,7 @@
     currentDrawId = String(data.drawId);
     const prizeId = String(data.result);
 
-    prizeImage.src = prizeId + '.png?v=final1';
+    prizeImage.src = prizeId + '.png?v=final2';
     setToast(alreadyDrawn ? 'このLINEアカウントは抽選済みです。' : '');
 
     if(data.redeemed === true || data.redeemStatus === '引換済み'){
@@ -223,7 +258,7 @@
 
     // 動画中に当選画像を先読み
     const preloadImage = new Image();
-    preloadImage.src = prizeId + '.png?v=final1';
+    preloadImage.src = prizeId + '.png?v=final2';
 
     showOnly(videoScreen);
     videoTap.style.display = 'none';
