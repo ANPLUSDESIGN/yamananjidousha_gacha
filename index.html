@@ -405,11 +405,7 @@
     showOnly(resultScreen);
   }
 
-  async function playMovieThenResult(data) {
-    const preloadImage = new Image();
-    const preloadPrizeId = String(data.result);
-    preloadImage.src = (PRIZE_IMAGES[preloadPrizeId] || '') + '?v=' + ASSET_VER;
-
+  function playMovieAndWait() {
     showOnly(movieScreen);
     videoTap.style.display = 'none';
 
@@ -418,81 +414,80 @@
       movie.currentTime = 0;
     } catch (error) {}
 
-    let resultShown = false;
-    let finishTimer = null;
-    let hardTimer = null;
+    return new Promise((resolve) => {
+      let finished = false;
+      let finishTimer = null;
+      let hardTimer = null;
 
-    function clearFinishTimers() {
-      if (finishTimer) {
-        clearTimeout(finishTimer);
-        finishTimer = null;
-      }
-      if (hardTimer) {
-        clearTimeout(hardTimer);
-        hardTimer = null;
-      }
-    }
+      function cleanup() {
+        if (finishTimer) {
+          clearTimeout(finishTimer);
+          finishTimer = null;
+        }
+        if (hardTimer) {
+          clearTimeout(hardTimer);
+          hardTimer = null;
+        }
 
-    function showResult() {
-      if (resultShown) return;
-      resultShown = true;
-      clearFinishTimers();
-
-      try { movie.pause(); } catch (error) {}
-
-      showPrizeResult(data, false);
-    }
-
-    // LINE内ブラウザで ended が発火しない場合があるため、
-    // ended だけに頼らず duration / timeupdate / 強制タイマーで必ず結果へ進む。
-    function armFinishTimer() {
-      if (resultShown) return;
-
-      if (finishTimer) {
-        clearTimeout(finishTimer);
+        movie.onended = null;
+        movie.onerror = null;
+        movie.onloadedmetadata = null;
+        movie.onplaying = null;
+        movie.ontimeupdate = null;
       }
 
-      const duration = Number(movie.duration);
-      const current = Number(movie.currentTime) || 0;
-
-      if (Number.isFinite(duration) && duration > 0) {
-        const remainMs = Math.max(300, (duration - current) * 1000 + 350);
-        finishTimer = setTimeout(showResult, remainMs);
+      function finish() {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        resolve();
       }
-    }
 
-    movie.onended = showResult;
-    movie.onerror = showResult;
+      function armFinishTimer() {
+        if (finished) return;
 
-    movie.onloadedmetadata = armFinishTimer;
-    movie.onplaying = armFinishTimer;
-    movie.ontimeupdate = function() {
-      const current = Number(movie.currentTime) || 0;
+        if (finishTimer) {
+          clearTimeout(finishTimer);
+        }
 
-      // y.mp4 は約13秒。12.7秒まで来たら結果へ切り替える。
-      if (current >= 12.7) {
-        showResult();
+        const duration = Number(movie.duration);
+        const current = Number(movie.currentTime) || 0;
+
+        if (Number.isFinite(duration) && duration > 0) {
+          const remainMs = Math.max(300, (duration - current) * 1000 + 250);
+          finishTimer = setTimeout(finish, remainMs);
+        }
       }
-    };
 
-    // 最終保険。LINE内ブラウザで ended / timeupdate が欠けても
-    // 再生開始から13.6秒で必ず景品画面へ切り替える。
-    hardTimer = setTimeout(showResult, 13600);
+      movie.onended = finish;
+      movie.onerror = finish;
+      movie.onloadedmetadata = armFinishTimer;
+      movie.onplaying = armFinishTimer;
+      movie.ontimeupdate = function() {
+        const current = Number(movie.currentTime) || 0;
+        if (current >= 12.7) {
+          finish();
+        }
+      };
 
-    const playPromise = movie.play();
+      // y.mp4 は約13秒。LINE内ブラウザで ended が欠けても13.6秒で終了扱い。
+      hardTimer = setTimeout(finish, 13600);
 
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(() => {
-        videoTap.style.display = 'flex';
-        videoTapButton.onclick = () => {
-          videoTap.style.display = 'none';
-          const retry = movie.play();
-          if (retry && typeof retry.catch === 'function') {
-            retry.catch(showResult);
-          }
-        };
-      });
-    }
+      const playPromise = movie.play();
+
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          videoTap.style.display = 'flex';
+          videoTapButton.onclick = () => {
+            videoTap.style.display = 'none';
+            const retry = movie.play();
+            if (retry && typeof retry.catch === 'function') {
+              retry.catch(finish);
+            }
+          };
+        });
+      }
+    });
   }
 
   drawButton.addEventListener('click', async () => {
@@ -501,6 +496,10 @@
     drawBusy = true;
     drawButton.disabled = true;
     drawButton.textContent = '抽選中…';
+
+    // ボタンを押した瞬間に動画を開始。
+    // GAS抽選は動画と同時進行にして、最初の待ち時間をなくす。
+    const moviePromise = playMovieAndWait();
 
     try {
       const data = await requestApi('draw', {
@@ -515,15 +514,30 @@
         );
       }
 
+      // 2回目は新規抽選せず、前回結果をすぐ表示。
       if (data.alreadyDrawn === true) {
+        try { movie.pause(); } catch (error) {}
         showPrizeResult(data, true);
         return;
       }
 
-      await playMovieThenResult(data);
+      // 動画中に当選画像を先読み。
+      const prizeId = String(data.result || '');
+      if (PRIZE_IMAGES[prizeId]) {
+        const preloadImage = new Image();
+        preloadImage.src = PRIZE_IMAGES[prizeId] + '?v=' + ASSET_VER;
+      }
+
+      // GAS結果と13秒動画の両方が終わった時点で景品画面へ。
+      await moviePromise;
+      showPrizeResult(data, false);
 
     } catch (error) {
       console.error(error);
+
+      try { movie.pause(); } catch (error2) {}
+
+      showOnly(startScreen);
       drawButton.disabled = false;
       drawButton.textContent = 'ガチャをひく';
 
