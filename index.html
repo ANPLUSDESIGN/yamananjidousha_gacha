@@ -5,42 +5,49 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>山南自動車 大抽選会</title>
+
   <link rel="preload" as="image" href="yt.png">
-  <script defer src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;width:100%;min-height:100%;background:#fff;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic","Meiryo",sans-serif;-webkit-text-size-adjust:100%}
-    body{overflow-x:hidden;overscroll-behavior-y:none}
+    html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic","Meiryo",sans-serif;-webkit-text-size-adjust:100%}
+    body{min-height:100dvh;overflow-x:hidden}
     button{font:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-appearance:none;appearance:none}
-    .screen{display:none;width:100%}
-    .screen.active{display:flex;justify-content:center;align-items:flex-start}
+    .screen{display:none;width:100%;min-height:100dvh;justify-content:center;align-items:flex-start}
+    .screen.active{display:flex}
     .frame{position:relative;width:100%;max-width:720px;margin:0 auto;line-height:0}
     .full-image,#gachaVideo{display:block;width:100%;height:auto;margin:0;border:0}
     .full-image{user-select:none;-webkit-user-drag:none}
 
+    /* TOP */
     #startScreen{background:#fff}
     #topImage{pointer-events:none}
     #drawButton{position:absolute;left:50%;bottom:5.8%;transform:translateX(-50%);z-index:5;width:78%;min-height:70px;padding:12px 20px;border:4px solid #ffe500;border-radius:999px;background:linear-gradient(#0aa04b,#046632);color:#fff;font-size:clamp(22px,4.4vw,32px);font-weight:900;line-height:1.1;letter-spacing:.04em;text-shadow:0 2px 0 rgba(0,0,0,.2);box-shadow:0 7px 0 #034520,0 10px 20px rgba(0,0,0,.18);cursor:pointer}
     #drawButton:active:not(:disabled){transform:translate(-50%,4px);box-shadow:0 3px 0 #034520,0 6px 14px rgba(0,0,0,.14)}
     #drawButton:disabled{opacity:.62;cursor:default}
-    #startMessage{display:none;position:absolute;left:50%;bottom:14.7%;transform:translateX(-50%);z-index:6;width:84%;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.96);color:#14502d;font-size:clamp(12px,2.5vw,16px);font-weight:800;line-height:1.45;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    #startMessage{display:none;position:absolute;left:50%;bottom:14.7%;transform:translateX(-50%);z-index:6;width:84%;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.97);color:#14502d;font-size:clamp(12px,2.5vw,16px);font-weight:800;line-height:1.45;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.12)}
     #startMessage.error{color:#a51e2c}
 
-    #videoScreen{background:#000}
-    #gachaVideo{background:#000;object-fit:contain}
-    #videoTap{display:none;position:absolute;inset:0;z-index:7;align-items:center;justify-content:center;background:rgba(0,0,0,.42)}
-    #videoTap button{width:80%;min-height:72px;border:3px solid #fff;border-radius:999px;background:#08753c;color:#fff;font-size:22px;font-weight:900}
+    /* 動画 */
+    #videoScreen{background:#000;align-items:center}
+    #gachaVideo{width:100%;max-height:100dvh;object-fit:contain;background:#000}
+    #videoTap{display:none;position:absolute;inset:0;z-index:10;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
+    #videoTap button{width:80%;max-width:500px;min-height:72px;border:3px solid #fff;border-radius:999px;background:#08753c;color:#fff;font-size:22px;font-weight:900}
 
+    /* 結果 */
     #resultScreen{background:#fff}
     #redeemButton,#redeemed{position:absolute;left:50%;bottom:4.4%;transform:translateX(-50%);z-index:5;width:78%;min-height:68px;border-radius:18px;font-weight:900;line-height:1.2}
     #redeemButton{border:0;background:rgba(15,15,15,.94);color:#fff;font-size:clamp(19px,3.8vw,26px);cursor:pointer}
-    #redeemButton:disabled{opacity:.6;cursor:default}
+    #redeemButton:disabled{opacity:.58;cursor:default}
     #redeemed{display:none;align-items:center;justify-content:center;padding:12px;background:rgba(230,230,230,.97);color:#666;font-size:clamp(22px,4vw,30px)}
     #resultToast{display:none;position:absolute;left:50%;bottom:13.2%;transform:translateX(-50%);z-index:6;width:84%;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.97);color:#333;font-size:14px;font-weight:800;line-height:1.45;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+
     @media(max-width:420px){#drawButton{min-height:64px}#redeemButton,#redeemed{min-height:62px}}
   </style>
 </head>
 <body>
+
   <section id="startScreen" class="screen active">
     <div class="frame">
       <img id="topImage" class="full-image" src="yt.png" width="720" height="1080" alt="山南自動車 大抽選会">
@@ -51,10 +58,8 @@
 
   <section id="videoScreen" class="screen">
     <div class="frame">
-      <video id="gachaVideo" playsinline webkit-playsinline preload="metadata">
-        <source src="y.mp4" type="video/mp4">
-      </video>
-      <div id="videoTap"><button id="videoTapButton" type="button">タップして抽選スタート</button></div>
+      <video id="gachaVideo" src="y.mp4" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
+      <div id="videoTap"><button id="videoTapButton" type="button">タップして動画を再生</button></div>
     </div>
   </section>
 
@@ -67,271 +72,294 @@
     </div>
   </section>
 
-  <script>
-    const API_URL='https://script.google.com/macros/s/AKfycbxE4H0xTiuuM4tgMAH32exXPDMnq3mZDA8sEYNeZ2lpvglsyGevvzxMEBr9d9LdOkhm/exec';
-    const LIFF_ID='2011684043-GnjrPlL2';
-    const STORE='yamanan_gacha_v4';
+<script>
+  /* ==================================================
+     山南自動車：犬川実績方式
+     - LIFF認証
+     - GAS通信はJSONP
+     - 1LINEアカウント1回はGAS側
+     ================================================== */
 
-    const $=id=>document.getElementById(id);
-    const startScreen=$('startScreen'),videoScreen=$('videoScreen'),resultScreen=$('resultScreen');
-    const drawButton=$('drawButton'),startMessage=$('startMessage');
-    const gachaVideo=$('gachaVideo'),videoTap=$('videoTap'),videoTapButton=$('videoTapButton');
-    const prizeImage=$('prizeImage'),redeemButton=$('redeemButton'),redeemed=$('redeemed'),resultToast=$('resultToast');
+  const GACHA_API_URL = 'https://script.google.com/macros/s/AKfycbxE4H0xTiuuM4tgMAH32exXPDMnq3mZDA8sEYNeZ2lpvglsyGevvzxMEBr9d9LdOkhm/exec';
+  const LIFF_ID = '2011684043-GnjrPlL2';
 
-    let lineUserId='',current=null,drawBusy=false,redeemBusy=false,authReady=false;
+  const $ = id => document.getElementById(id);
+  const startScreen = $('startScreen');
+  const videoScreen = $('videoScreen');
+  const resultScreen = $('resultScreen');
+  const drawButton = $('drawButton');
+  const startMessage = $('startMessage');
+  const movie = $('gachaVideo');
+  const videoTap = $('videoTap');
+  const videoTapButton = $('videoTapButton');
+  const prizeImage = $('prizeImage');
+  const redeemButton = $('redeemButton');
+  const redeemed = $('redeemed');
+  const resultToast = $('resultToast');
 
-    function show(screen){
-      startScreen.classList.remove('active');
-      videoScreen.classList.remove('active');
-      resultScreen.classList.remove('active');
-      screen.classList.add('active');
-      window.scrollTo(0,0);
-    }
+  let lineIdToken = '';
+  let currentDrawId = '';
+  let currentPrizeId = '';
+  let drawBusy = false;
+  let redeemBusy = false;
 
-    function startMsg(text,error=false){
-      startMessage.textContent=text||'';
-      startMessage.classList.toggle('error',error);
-      startMessage.style.display=text?'block':'none';
-    }
+  function showOnly(screen){
+    startScreen.classList.remove('active');
+    videoScreen.classList.remove('active');
+    resultScreen.classList.remove('active');
+    screen.classList.add('active');
+    window.scrollTo(0,0);
+  }
 
-    function toast(text){
-      resultToast.textContent=text||'';
-      resultToast.style.display=text?'block':'none';
-    }
+  function setStartMessage(text,error=false){
+    startMessage.textContent = text || '';
+    startMessage.classList.toggle('error',error);
+    startMessage.style.display = text ? 'block' : 'none';
+  }
 
-    function loadStore(){
-      try{return JSON.parse(localStorage.getItem(STORE)||'null')}catch(e){return null}
-    }
+  function setToast(text){
+    resultToast.textContent = text || '';
+    resultToast.style.display = text ? 'block' : 'none';
+  }
 
-    function saveStore(data){
-      try{localStorage.setItem(STORE,JSON.stringify(data))}catch(e){}
-    }
+  /* ==================================================
+     GAS JSONP通信
+     犬川と同じ方式。iPhoneのLINE内ブラウザで
+     fetch/AbortControllerに依存しない。
+     ================================================== */
+  function requestApi(action, params = {}){
+    return new Promise((resolve,reject)=>{
+      const callbackName = 'yamananGachaCallback_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      let finished = false;
 
-    async function post(data,timeout=12000){
-      const controller=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),timeout);
-      try{
-        const response=await fetch(API_URL,{
-          method:'POST',
-          cache:'no-store',
-          body:JSON.stringify(data),
-          signal:controller.signal
-        });
-        const text=await response.text();
-        try{return JSON.parse(text)}
-        catch(e){throw new Error('サーバー応答を確認できませんでした。')}
-      }finally{
+      const timer = setTimeout(()=>{
+        cleanup();
+        reject(new Error('通信タイムアウト'));
+      },40000);
+
+      function cleanup(){
+        if(finished)return;
+        finished = true;
         clearTimeout(timer);
+        try{delete window[callbackName]}catch(e){window[callbackName]=undefined}
+        if(script.parentNode)script.parentNode.removeChild(script);
       }
-    }
 
-    async function initializeLine(){
-      authReady=false;
-      drawButton.disabled=true;
-      drawButton.textContent='LINE認証を確認しています…';
-      startMsg('');
+      window[callbackName] = data => {
+        cleanup();
+        resolve(data);
+      };
 
-      try{
-        if(!window.liff)throw new Error('LINEの読み込みに失敗しました。もう一度開いてください。');
+      script.onerror = () => {
+        cleanup();
+        reject(new Error('通信エラー'));
+      };
 
-        await liff.init({liffId:LIFF_ID});
+      let url = GACHA_API_URL +
+        '?action=' + encodeURIComponent(action) +
+        '&callback=' + encodeURIComponent(callbackName) +
+        '&_=' + Date.now();
 
-        if(!liff.isLoggedIn()){
-          liff.login({redirectUri:location.href});
-          return;
-        }
-
-        const profile=await liff.getProfile();
-        const uid=String(profile&&profile.userId||'').trim();
-
-        if(!/^U[0-9A-Za-z_-]{20,80}$/.test(uid)){
-          throw new Error('LINE認証を確認できませんでした。LINEからもう一度開いてください。');
-        }
-
-        lineUserId=uid;
-        authReady=true;
-        drawButton.disabled=false;
-        drawButton.textContent='ガチャをひく';
-
-      }catch(e){
-        authReady=false;
-        lineUserId='';
-        drawButton.disabled=true;
-        drawButton.textContent='LINE認証エラー';
-        startMsg(e&&e.message?e.message:'LINE認証を確認できませんでした。',true);
-      }
-    }
-
-    function setCurrent(result){
-      current=result;
-      saveStore({
-        drawId:result.drawId,
-        prizeId:result.prizeId,
-        prizeName:result.prizeName||'',
-        redeemStatus:result.redeemStatus||'未引換',
-        sessionToken:result.sessionToken||''
+      Object.keys(params).forEach(key=>{
+        url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
       });
-      if(result.prizeId){
-        const img=new Image();
-        img.src=result.prizeId+'.png';
-      }
+
+      script.src = url;
+      document.head.appendChild(script);
+    });
+  }
+
+  /* ==================================================
+     LINE認証
+     QRはLIFF URLから直接このページへ入る前提。
+     初回はLINE公式の許可画面が出る。
+     ================================================== */
+  async function initLineAuth(){
+    if(typeof liff === 'undefined'){
+      throw new Error('LINE認証を読み込めませんでした。');
     }
 
-    async function playVideo(){
-      show(videoScreen);
-      videoTap.style.display='none';
+    await liff.init({liffId: LIFF_ID});
 
-      try{
-        gachaVideo.pause();
-        gachaVideo.currentTime=0;
-      }catch(e){}
+    if(!liff.isLoggedIn()){
+      liff.login({redirectUri: location.href});
+      return false;
+    }
 
-      gachaVideo.controls=false;
-      gachaVideo.muted=false;
+    const token = liff.getIDToken();
+    if(!token){
+      throw new Error('LINE認証情報を取得できませんでした。');
+    }
 
-      try{
-        await gachaVideo.play();
-      }catch(e){
-        gachaVideo.muted=true;
+    lineIdToken = token;
+    return true;
+  }
+
+  function showPrizeResult(data,alreadyDrawn=false){
+    if(!data || !data.result || !data.drawId){
+      throw new Error('当選結果を確認できませんでした。');
+    }
+
+    currentPrizeId = String(data.result);
+    currentDrawId = String(data.drawId);
+
+    prizeImage.src = currentPrizeId + '.png';
+    setToast(alreadyDrawn ? 'このLINEアカウントは抽選済みです。' : '');
+
+    if(data.redeemed === true || data.redeemStatus === '引換済み'){
+      redeemButton.style.display = 'none';
+      redeemed.style.display = 'flex';
+    }else{
+      redeemed.style.display = 'none';
+      redeemButton.style.display = 'block';
+      redeemButton.disabled = false;
+      redeemButton.textContent = '景品交換する';
+    }
+
+    showOnly(resultScreen);
+  }
+
+  async function playMovieThenResult(data){
+    currentPrizeId = String(data.result);
+    currentDrawId = String(data.drawId);
+
+    // 結果画像を動画中に先読み
+    const img = new Image();
+    img.src = currentPrizeId + '.png';
+
+    showOnly(videoScreen);
+    videoTap.style.display = 'none';
+
+    try{
+      movie.pause();
+      movie.currentTime = 0;
+    }catch(e){}
+
+    let resultShown = false;
+    const showResult = () => {
+      if(resultShown)return;
+      resultShown = true;
+      showPrizeResult(data,false);
+    };
+
+    movie.onended = showResult;
+    movie.onerror = showResult;
+
+    try{
+      movie.muted = false;
+      await movie.play();
+    }catch(e){
+      // iPhoneでユーザー操作扱いが外れた場合だけタップを要求。
+      videoTap.style.display = 'flex';
+      videoTapButton.onclick = async () => {
+        videoTap.style.display = 'none';
         try{
-          await gachaVideo.play();
+          movie.muted = false;
+          await movie.play();
         }catch(e2){
-          videoTap.style.display='flex';
+          // 再生できない端末でも景品結果は失わない。
+          showResult();
         }
-      }
+      };
     }
+  }
 
-    videoTapButton.addEventListener('click',async()=>{
-      videoTap.style.display='none';
-      gachaVideo.muted=false;
-      try{
-        await gachaVideo.play();
-      }catch(e){
-        gachaVideo.muted=true;
-        try{await gachaVideo.play()}
-        catch(e2){videoTap.style.display='flex'}
+  drawButton.addEventListener('click',async()=>{
+    if(drawBusy || !lineIdToken)return;
+
+    drawBusy = true;
+    drawButton.disabled = true;
+    drawButton.textContent = '抽選中…';
+    setStartMessage('');
+
+    try{
+      // 犬川と同じく、GASで1回制御・在庫・ログを確定してから動画へ。
+      const data = await requestApi('draw',{idToken: lineIdToken});
+
+      if(!data || data.success !== true){
+        throw new Error(data && data.message ? data.message : '抽選できませんでした。');
       }
-    });
 
-    function showResult(result){
-      if(!result||!result.prizeId)return;
-      setCurrent(result);
-      prizeImage.src=result.prizeId+'.png';
-      toast('');
-      show(resultScreen);
-
-      if(result.redeemStatus==='引換済み'){
-        redeemButton.style.display='none';
-        redeemed.style.display='flex';
-      }else{
-        redeemed.style.display='none';
-        redeemButton.style.display='block';
-        redeemButton.disabled=false;
-        redeemButton.textContent='景品交換する';
+      if(data.alreadyDrawn === true){
+        showPrizeResult(data,true);
+        return;
       }
+
+      await playMovieThenResult(data);
+
+    }catch(error){
+      console.error(error);
+      drawButton.disabled = false;
+      drawButton.textContent = 'ガチャをひく';
+      setStartMessage(error && error.message ? error.message : '抽選中にエラーが発生しました。',true);
+      showOnly(startScreen);
+    }finally{
+      drawBusy = false;
     }
+  });
 
-    function returnError(message){
-      try{gachaVideo.pause()}catch(e){}
-      show(startScreen);
-      drawBusy=false;
-      drawButton.disabled=!authReady;
-      drawButton.textContent=authReady?'ガチャをひく':'LINE認証を確認しています…';
-      startMsg(message||'通信エラーが発生しました。',true);
+  redeemButton.addEventListener('click',async()=>{
+    if(redeemBusy || !currentDrawId)return;
+
+    const confirmed = window.confirm(
+      'スタッフの方が操作してください。\n\n景品をお客様へお渡しした後に「OK」を押してください。'
+    );
+    if(!confirmed)return;
+
+    redeemBusy = true;
+    redeemButton.disabled = true;
+    redeemButton.textContent = '処理中…';
+    setToast('');
+
+    try{
+      const data = await requestApi('redeem',{drawId: currentDrawId});
+
+      if(!data || data.success !== true){
+        throw new Error(data && data.message ? data.message : '引換処理に失敗しました。');
+      }
+
+      redeemButton.style.display = 'none';
+      redeemed.style.display = 'flex';
+
+    }catch(error){
+      console.error(error);
+      redeemButton.disabled = false;
+      redeemButton.textContent = '景品交換する';
+      setToast(error && error.message ? error.message : '引換処理中にエラーが発生しました。');
+    }finally{
+      redeemBusy = false;
     }
+  });
 
-    drawButton.addEventListener('click',async()=>{
-      if(drawBusy||!authReady||!lineUserId)return;
+  async function initializePage(){
+    drawButton.disabled = true;
+    drawButton.textContent = 'LINE認証を確認しています…';
+    setStartMessage('');
 
-      drawBusy=true;
-      drawButton.disabled=true;
-      drawButton.textContent='抽選準備中…';
-      startMsg('');
+    // 動画の読み込みを先行。通信とは独立。
+    try{movie.load()}catch(e){}
 
-      try{
-        const saved=loadStore();
-        const result=await post({
-          action:'draw',
-          userId:lineUserId,
-          sessionToken:saved&&saved.sessionToken?saved.sessionToken:''
-        },10000);
+    try{
+      const ok = await initLineAuth();
+      if(!ok)return;
 
-        if(!result||!result.ok){
-          throw new Error(result&&result.message?result.message:'抽選できませんでした。');
-        }
+      drawButton.disabled = false;
+      drawButton.textContent = 'ガチャをひく';
 
-        setCurrent(result);
+    }catch(error){
+      console.error(error);
+      drawButton.disabled = true;
+      drawButton.textContent = 'LINE認証エラー';
+      setStartMessage(
+        (error && error.message ? error.message : 'LINE認証に失敗しました。') +
+        ' LINEからもう一度開いてください。',
+        true
+      );
+    }
+  }
 
-        if(result.alreadyDrawn){
-          showResult(result);
-          toast('このLINEアカウントは抽選済みです。');
-          return;
-        }
-
-        // GASで在庫更新・ログ保存が成功してから動画を開始する。
-        await playVideo();
-
-      }catch(e){
-        returnError(e&&e.name==='AbortError'
-          ?'通信に時間がかかっています。もう一度お試しください。'
-          :(e&&e.message?e.message:'抽選できませんでした。'));
-      }finally{
-        drawBusy=false;
-      }
-    });
-
-    gachaVideo.addEventListener('ended',()=>{
-      if(current)showResult(current);
-    });
-
-    redeemButton.addEventListener('click',async()=>{
-      if(redeemBusy||!current||!current.drawId)return;
-
-      if(!window.confirm('スタッフの方が操作してください。\n\n景品を確認して「OK」を押してください。'))return;
-
-      redeemBusy=true;
-      redeemButton.disabled=true;
-      redeemButton.textContent='処理中…';
-      toast('');
-
-      try{
-        const result=await post({
-          action:'redeem',
-          drawId:current.drawId,
-          sessionToken:current.sessionToken||''
-        },10000);
-
-        if(!result||!result.ok){
-          throw new Error(result&&result.message?result.message:'景品交換を記録できませんでした。');
-        }
-
-        current.redeemStatus='引換済み';
-        if(result.sessionToken)current.sessionToken=result.sessionToken;
-        setCurrent(current);
-
-        redeemButton.style.display='none';
-        redeemed.style.display='flex';
-        toast('景品交換を記録しました。');
-
-      }catch(e){
-        redeemButton.disabled=false;
-        redeemButton.textContent='景品交換する';
-        toast(e&&e.name==='AbortError'
-          ?'通信に時間がかかっています。もう一度押してください。'
-          :(e&&e.message?e.message:'景品交換を記録できませんでした。'));
-      }finally{
-        redeemBusy=false;
-      }
-    });
-
-    window.addEventListener('load',initializeLine,{once:true});
-
-    window.addEventListener('pageshow',e=>{
-      if(e.persisted){
-        drawBusy=false;
-        if(!authReady)initializeLine();
-      }
-    });
-  </script>
+  initializePage();
+</script>
 </body>
 </html>
