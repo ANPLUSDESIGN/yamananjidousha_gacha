@@ -9,7 +9,7 @@
   <meta http-equiv="Expires" content="0">
   <title>山南自動車 大抽選会</title>
 
-  <link rel="preload" as="image" href="yt.png?v=final2">
+  <link rel="preload" as="image" href="yt.png?v=smooth1">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
@@ -50,7 +50,7 @@
 
   <section id="startScreen" class="screen active">
     <div class="frame">
-      <img id="topImage" class="full-image" src="yt.png?v=final2" width="720" height="1080" alt="山南自動車 大抽選会">
+      <img id="topImage" class="full-image" src="yt.png?v=smooth1" width="720" height="1080" alt="山南自動車 大抽選会">
       <div id="startMessage" role="status" aria-live="polite"></div>
       <button id="drawButton" type="button" disabled>LINE認証を確認しています…</button>
     </div>
@@ -58,7 +58,7 @@
 
   <section id="videoScreen" class="screen">
     <div class="frame">
-      <video id="gachaVideo" src="y.mp4?v=final2" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
+      <video id="gachaVideo" src="y.mp4?v=smooth1" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
       <div id="videoTap"><button id="videoTapButton" type="button">タップして動画を再生</button></div>
     </div>
   </section>
@@ -74,13 +74,14 @@
 
 <script>
   // ==================================================
-  // 山南自動車 FINAL
-  // LIFF profileでuserId取得 + GAS iframe bridge通信
-  // fetch / AbortController / ID Token / UrlFetchApp は使わない
+  // 山南自動車 SMOOTH
+  // QR -> LIFF -> ガチャ -> 動画 -> 景品 -> 引換
+  // 1LINEアカウント1回はGAS側で制御
   // ==================================================
 
   const GACHA_API_URL = 'https://script.google.com/macros/s/AKfycbxE4H0xTiuuM4tgMAH32exXPDMnq3mZDA8sEYNeZ2lpvglsyGevvzxMEBr9d9LdOkhm/exec';
   const LIFF_ID = '2011684043-GnjrPlL2';
+  const ASSET_VER = 'smooth1';
 
   const $ = id => document.getElementById(id);
   const startScreen = $('startScreen');
@@ -99,7 +100,9 @@
   let lineUserId = '';
   let currentDrawId = '';
   let drawBusy = false;
-  let redeemBusy = false;
+  let movieEnded = false;
+  let pendingResult = null;
+  let drawRequestPromise = null;
 
   function showOnly(screen){
     startScreen.classList.remove('active');
@@ -120,79 +123,49 @@
     resultToast.style.display = text ? 'block' : 'none';
   }
 
-  // ==================================================
-  // GAS通信
-  // LINE内ブラウザでJSONPの<script>読込が失敗する端末対策。
-  // 非表示iframeでGASを開き、postMessageで結果だけ受け取る。
-  // fetch / CORS は使わない。
-  // ==================================================
-  function requestApi(action, params = {}){
+  // GAS iframe bridge。drawの結果だけ受け取る。
+  function requestApi(action, params = {}, timeout = 15000){
     return new Promise((resolve,reject)=>{
-      const nonce =
-        Date.now().toString(36) +
-        '_' +
-        Math.random().toString(36).slice(2);
-
+      const nonce = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       iframe.setAttribute('aria-hidden','true');
-
       let finished = false;
 
       const timer = setTimeout(()=>{
         cleanup();
         reject(new Error('通信タイムアウト'));
-      },40000);
+      }, timeout);
 
       function cleanup(){
         if(finished)return;
         finished = true;
         clearTimeout(timer);
-        window.removeEventListener('message',onMessage);
-
-        if(iframe.parentNode){
-          iframe.parentNode.removeChild(iframe);
-        }
+        window.removeEventListener('message', onMessage);
+        if(iframe.parentNode)iframe.parentNode.removeChild(iframe);
       }
 
       function onMessage(event){
         let message = event.data;
-
         if(typeof message === 'string'){
-          try{
-            message = JSON.parse(message);
-          }catch(e){
-            return;
-          }
+          try{ message = JSON.parse(message); }
+          catch(e){ return; }
         }
-
-        if(
-          !message ||
-          message.source !== 'yamanan-gacha-bridge' ||
-          message.nonce !== nonce
-        ){
-          return;
-        }
-
+        if(!message || message.source !== 'yamanan-gacha-bridge' || message.nonce !== nonce)return;
         cleanup();
         resolve(message.payload);
       }
 
-      window.addEventListener('message',onMessage);
+      window.addEventListener('message', onMessage);
 
-      let url =
-        GACHA_API_URL +
+      let url = GACHA_API_URL +
         '?action=' + encodeURIComponent(action) +
         '&bridge=1' +
         '&nonce=' + encodeURIComponent(nonce) +
         '&_=' + Date.now();
 
       Object.keys(params).forEach(key=>{
-        url +=
-          '&' +
-          encodeURIComponent(key) +
-          '=' +
-          encodeURIComponent(params[key]);
+        url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
       });
 
       iframe.src = url;
@@ -200,18 +173,31 @@
     });
   }
 
+  // 引換は待たせない。GAS側が冪等なので2回送っても二重処理にならない。
+  function sendRedeem(drawId){
+    const send = () => {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden','true');
+      iframe.src = GACHA_API_URL +
+        '?action=redeem' +
+        '&bridge=1' +
+        '&nonce=' + encodeURIComponent('redeem_' + Date.now() + '_' + Math.random().toString(36).slice(2)) +
+        '&drawId=' + encodeURIComponent(drawId) +
+        '&_=' + Date.now();
+      document.body.appendChild(iframe);
+      setTimeout(()=>{
+        if(iframe.parentNode)iframe.parentNode.removeChild(iframe);
+      },60000);
+    };
 
-  // ==================================================
-  // LINE認証
-  // profile scopeだけでOK
-  // ==================================================
+    send();
+    setTimeout(send,2500);
+  }
+
   async function initLine(){
-    if(typeof liff === 'undefined'){
-      throw new Error('LINEを読み込めませんでした。');
-    }
-
+    if(typeof liff === 'undefined')throw new Error('LINEを読み込めませんでした。');
     await liff.init({liffId: LIFF_ID});
-
     if(!liff.isLoggedIn()){
       liff.login({redirectUri: location.href});
       return false;
@@ -219,11 +205,9 @@
 
     const profile = await liff.getProfile();
     const userId = String(profile && profile.userId || '').trim();
-
     if(!/^U[0-9A-Za-z_-]{20,80}$/.test(userId)){
       throw new Error('LINEユーザーを確認できませんでした。');
     }
-
     lineUserId = userId;
     return true;
   }
@@ -235,8 +219,8 @@
 
     currentDrawId = String(data.drawId);
     const prizeId = String(data.result);
+    prizeImage.src = prizeId + '.png?v=' + ASSET_VER;
 
-    prizeImage.src = prizeId + '.png?v=final2';
     setToast(alreadyDrawn ? 'このLINEアカウントは抽選済みです。' : '');
 
     if(data.redeemed === true || data.redeemStatus === '引換済み'){
@@ -252,14 +236,9 @@
     showOnly(resultScreen);
   }
 
-  async function playMovieThenResult(data){
-    currentDrawId = String(data.drawId);
-    const prizeId = String(data.result);
-
-    // 動画中に当選画像を先読み
-    const preloadImage = new Image();
-    preloadImage.src = prizeId + '.png?v=final2';
-
+  function prepareMovie(){
+    movieEnded = false;
+    pendingResult = null;
     showOnly(videoScreen);
     videoTap.style.display = 'none';
 
@@ -268,101 +247,123 @@
       movie.currentTime = 0;
     }catch(e){}
 
-    let shown = false;
+    movie.onended = async () => {
+      movieEnded = true;
+      if(pendingResult){
+        showPrizeResult(pendingResult,false);
+        return;
+      }
 
-    const finish = () => {
-      if(shown)return;
-      shown = true;
-      showPrizeResult(data,false);
+      try{
+        if(drawRequestPromise)await drawRequestPromise;
+        if(pendingResult){
+          showPrizeResult(pendingResult,false);
+          return;
+        }
+      }catch(e){}
+
+      // 動画終了までに結果が来ない場合だけTOPへ戻す
+      showOnly(startScreen);
+      drawButton.disabled = false;
+      drawButton.textContent = 'ガチャをひく';
+      setStartMessage('抽選結果を確認できませんでした。もう一度押してください。',true);
+      drawBusy = false;
     };
 
-    movie.onended = finish;
-    movie.onerror = finish;
+    movie.onerror = movie.onended;
 
-    try{
-      movie.muted = false;
-      await movie.play();
-    }catch(e){
-      // iPhoneが再生を止めた時だけ1タップ
-      videoTap.style.display = 'flex';
-      videoTapButton.onclick = async () => {
-        videoTap.style.display = 'none';
-        try{
-          movie.muted = false;
-          await movie.play();
-        }catch(e2){
-          finish();
-        }
-      };
+    // ボタンタップ直後なのでiPhoneでも再生しやすい
+    const p = movie.play();
+    if(p && typeof p.catch === 'function'){
+      p.catch(()=>{
+        videoTap.style.display = 'flex';
+      });
     }
   }
 
-  drawButton.addEventListener('click',async()=>{
+  videoTapButton.addEventListener('click',()=>{
+    videoTap.style.display = 'none';
+    const p = movie.play();
+    if(p && typeof p.catch === 'function'){
+      p.catch(()=>{ videoTap.style.display = 'flex'; });
+    }
+  });
+
+  drawButton.addEventListener('click',()=>{
     if(drawBusy || !lineUserId)return;
 
     drawBusy = true;
     drawButton.disabled = true;
-    drawButton.textContent = '抽選中…';
     setStartMessage('');
 
-    try{
-      // GASで1LINE1回・在庫・ログ確定後に動画へ
-      const data = await requestApi('draw',{userId: lineUserId});
+    // 先に動画を始める。待ち画面を作らない。
+    prepareMovie();
+
+    drawRequestPromise = (async()=>{
+      let firstFailed = false;
+      let data = null;
+
+      try{
+        data = await requestApi('draw',{userId: lineUserId},15000);
+      }catch(e){
+        firstFailed = true;
+        // 1回目がGASでは成功して返答だけ落ちた場合に備え、同じuserIdで1回だけ確認。
+        data = await requestApi('draw',{userId: lineUserId},15000);
+      }
 
       if(!data || data.success !== true){
         throw new Error(data && data.message ? data.message : '抽選できませんでした。');
       }
 
-      if(data.alreadyDrawn === true){
+      // 直接「抽選済み」が返った場合は過去抽選なので動画を止めて即表示。
+      // ただし1回目の返答が落ちた後の再確認なら、今回の抽選結果として動画を続ける。
+      if(data.alreadyDrawn === true && !firstFailed){
+        try{ movie.pause(); }catch(e){}
         showPrizeResult(data,true);
-        return;
+        drawBusy = false;
+        return data;
       }
 
-      await playMovieThenResult(data);
+      pendingResult = data;
 
-    }catch(error){
-      console.error(error);
-      drawButton.disabled = false;
-      drawButton.textContent = 'ガチャをひく';
-      setStartMessage(error && error.message ? error.message : '抽選中にエラーが発生しました。',true);
-      showOnly(startScreen);
-    }finally{
+      // 結果画像を動画中に先読み
+      const preloadImage = new Image();
+      preloadImage.src = String(data.result) + '.png?v=' + ASSET_VER;
+
+      if(movieEnded){
+        showPrizeResult(data,false);
+      }
+
       drawBusy = false;
-    }
+      return data;
+    })().catch(error=>{
+      console.error(error);
+      if(movieEnded){
+        showOnly(startScreen);
+        drawButton.disabled = false;
+        drawButton.textContent = 'ガチャをひく';
+        setStartMessage(error && error.message ? error.message : '抽選できませんでした。',true);
+        drawBusy = false;
+      }
+      throw error;
+    });
   });
 
-  redeemButton.addEventListener('click',async()=>{
-    if(redeemBusy || !currentDrawId)return;
+  redeemButton.addEventListener('click',()=>{
+    if(!currentDrawId)return;
 
     const confirmed = window.confirm(
       'スタッフの方が操作してください。\n\n景品をお客様へお渡しした後に「OK」を押してください。'
     );
-
     if(!confirmed)return;
 
-    redeemBusy = true;
-    redeemButton.disabled = true;
-    redeemButton.textContent = '処理中…';
+    // UIは即完了。処理中で待たせない。
+    redeemButton.style.display = 'none';
+    redeemed.style.display = 'flex';
     setToast('');
 
-    try{
-      const data = await requestApi('redeem',{drawId: currentDrawId});
-
-      if(!data || data.success !== true){
-        throw new Error(data && data.message ? data.message : '引換処理に失敗しました。');
-      }
-
-      redeemButton.style.display = 'none';
-      redeemed.style.display = 'flex';
-
-    }catch(error){
-      console.error(error);
-      redeemButton.disabled = false;
-      redeemButton.textContent = '景品交換する';
-      setToast(error && error.message ? error.message : '引換処理中にエラーが発生しました。');
-    }finally{
-      redeemBusy = false;
-    }
+    // ログ更新は裏で送信。GAS側で重複は無害。
+    sendRedeem(currentDrawId);
   });
 
   async function initializePage(){
@@ -370,16 +371,15 @@
     drawButton.textContent = 'LINE認証を確認しています…';
     setStartMessage('');
 
-    // 動画読み込みを先行
-    try{movie.load()}catch(e){}
+    // 動画は先に読み込み開始
+    movie.src = 'y.mp4?v=' + ASSET_VER;
+    try{ movie.load(); }catch(e){}
 
     try{
       const ok = await initLine();
       if(!ok)return;
-
       drawButton.disabled = false;
       drawButton.textContent = 'ガチャをひく';
-
     }catch(error){
       console.error(error);
       drawButton.disabled = true;
