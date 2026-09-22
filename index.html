@@ -366,7 +366,7 @@
       <video
         id="gachaVideo"
         playsinline
-        preload="auto"
+        preload="metadata"
       >
 
         <source
@@ -635,42 +635,6 @@
 
 
     // ==================================================
-    // サーバー状態確認
-    // ==================================================
-
-    async function loadServerStatus() {
-
-      try {
-
-        const result =
-          await apiGet({
-            action:
-              'status'
-          });
-
-
-        if (
-          result &&
-          result.ok
-        ) {
-
-          currentDemoMode =
-            result.serverDemoMode ===
-            true;
-        }
-
-
-      } catch (error) {
-
-        console.error(
-          '状態確認エラー',
-          error
-        );
-      }
-    }
-
-
-    // ==================================================
     // LINE userId取得
     //
     // テスト・本番どちらも
@@ -772,13 +736,6 @@
 
 
           try {
-
-            // --------------------------------------
-            // 最新のテスト / 本番状態取得
-            // --------------------------------------
-
-            await loadServerStatus();
-
 
             // --------------------------------------
             // LINE userId取得
@@ -1315,8 +1272,6 @@
     // ==================================================
 
     async function startApp() {
-
-      await loadServerStatus();
 
       await restoreResult();
     }
