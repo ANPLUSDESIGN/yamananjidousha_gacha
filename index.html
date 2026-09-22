@@ -10,8 +10,8 @@
 
   <title>山南自動車 大抽選会</title>
 
-  <link rel="preload" as="image" href="yt.png?v=userid1">
-  <link rel="preload" as="video" href="y.mp4?v=userid1" type="video/mp4">
+  <link rel="preload" as="image" href="yt.png?v=userid2">
+  <link rel="preload" as="video" href="y.mp4?v=userid2" type="video/mp4">
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
@@ -221,14 +221,14 @@
 
   <section id="startScreen" class="screen">
     <div class="frame">
-      <img class="full-image" src="yt.png?v=userid1" width="720" height="1080" alt="山南自動車 大抽選会">
+      <img class="full-image" src="yt.png?v=userid2" width="720" height="1080" alt="山南自動車 大抽選会">
       <button id="drawButton" type="button">ガチャをひく</button>
     </div>
   </section>
 
   <section id="movieScreen" class="screen">
     <div class="frame">
-      <video id="gachaMovie" src="y.mp4?v=userid1" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
+      <video id="gachaMovie" src="y.mp4?v=userid2" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
       <div id="videoTap">
         <button id="videoTapButton" type="button">タップして動画を再生</button>
       </div>
@@ -247,7 +247,17 @@
 <script>
   const GACHA_API_URL = 'https://script.google.com/macros/s/AKfycbxE4H0xTiuuM4tgMAH32exXPDMnq3mZDA8sEYNeZ2lpvglsyGevvzxMEBr9d9LdOkhm/exec';
   const LIFF_ID = '2011684043-GnjrPlL2';
-  const ASSET_VER = 'userid1';
+  const ASSET_VER = 'userid3';
+
+  const PRIZE_IMAGES = {
+    y1: 'y1.png',
+    y2: 'y2.png',
+    y3: 'y3.png',
+    y4: 'y4.png',
+    y5: 'y5.png',
+    y6: 'y6.png',
+    y7: 'y7.png'
+  };
 
   const accessScreen = document.getElementById('accessScreen');
   const startScreen = document.getElementById('startScreen');
@@ -374,12 +384,12 @@
 
     const prizeId = String(data.result);
 
-    if (!/^y[1-7]$/.test(prizeId)) {
+    if (!PRIZE_IMAGES[prizeId]) {
       throw new Error('景品データがありません');
     }
 
     currentDrawId = String(data.drawId);
-    prizeImage.src = prizeId + '.png?v=' + ASSET_VER;
+    prizeImage.src = PRIZE_IMAGES[prizeId] + '?v=' + ASSET_VER;
     alreadyText.style.display = alreadyDrawn ? 'block' : 'none';
 
     if (data.redeemed === true || data.redeemStatus === '引換済み') {
@@ -397,7 +407,8 @@
 
   async function playMovieThenResult(data) {
     const preloadImage = new Image();
-    preloadImage.src = String(data.result) + '.png?v=' + ASSET_VER;
+    const preloadPrizeId = String(data.result);
+    preloadImage.src = (PRIZE_IMAGES[preloadPrizeId] || '') + '?v=' + ASSET_VER;
 
     showOnly(movieScreen);
     videoTap.style.display = 'none';
@@ -408,15 +419,65 @@
     } catch (error) {}
 
     let resultShown = false;
+    let finishTimer = null;
+    let hardTimer = null;
+
+    function clearFinishTimers() {
+      if (finishTimer) {
+        clearTimeout(finishTimer);
+        finishTimer = null;
+      }
+      if (hardTimer) {
+        clearTimeout(hardTimer);
+        hardTimer = null;
+      }
+    }
 
     function showResult() {
       if (resultShown) return;
       resultShown = true;
+      clearFinishTimers();
+
+      try { movie.pause(); } catch (error) {}
+
       showPrizeResult(data, false);
+    }
+
+    // LINE内ブラウザで ended が発火しない場合があるため、
+    // ended だけに頼らず duration / timeupdate / 強制タイマーで必ず結果へ進む。
+    function armFinishTimer() {
+      if (resultShown) return;
+
+      if (finishTimer) {
+        clearTimeout(finishTimer);
+      }
+
+      const duration = Number(movie.duration);
+      const current = Number(movie.currentTime) || 0;
+
+      if (Number.isFinite(duration) && duration > 0) {
+        const remainMs = Math.max(300, (duration - current) * 1000 + 350);
+        finishTimer = setTimeout(showResult, remainMs);
+      }
     }
 
     movie.onended = showResult;
     movie.onerror = showResult;
+
+    movie.onloadedmetadata = armFinishTimer;
+    movie.onplaying = armFinishTimer;
+    movie.ontimeupdate = function() {
+      const current = Number(movie.currentTime) || 0;
+
+      // y.mp4 は約13秒。12.7秒まで来たら結果へ切り替える。
+      if (current >= 12.7) {
+        showResult();
+      }
+    };
+
+    // 最終保険。LINE内ブラウザで ended / timeupdate が欠けても
+    // 再生開始から13.6秒で必ず景品画面へ切り替える。
+    hardTimer = setTimeout(showResult, 13600);
 
     const playPromise = movie.play();
 
