@@ -589,9 +589,7 @@
       redeemButton.textContent = '景品交換する';
 
       alert(
-        error && error.message
-          ? error.message
-          : '引換処理中にエラーが発生しました。'
+          '引換処理の確認に時間がかかっています。\nもう一度「景品交換する」を押してください。'
       );
 
     } finally {
